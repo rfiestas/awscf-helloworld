@@ -33,7 +33,7 @@
       "Description": "Application git tag",
       "Type": "String",
       "Default": "0.1",
-      "AllowedPattern": "(\\d{1,2})\\.(\\d{1,2})",
+      "AllowedPattern": "(\\d{1,2})\\.(\\d{1,2})([a-zA-Z_])*",
       "ConstraintDescription": "must be a valid Tag \"xx.xx\""
     }
   },
