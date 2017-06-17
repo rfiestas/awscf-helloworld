@@ -128,10 +128,17 @@
         "MaxSize" : "5",
         "LoadBalancerNames" : [ { "Ref" : "ElasticLoadBalancer" } ]
       },
+	  "CreationPolicy" : {
+        "ResourceSignal" : {
+          "Timeout" : "PT15M"
+        }
+      },
       "UpdatePolicy": {
         "AutoScalingRollingUpdate": {
           "MinInstancesInService": "1",
-          "MaxBatchSize": "1"
+          "MaxBatchSize": "1",
+          "PauseTime" : "PT10M",
+          "WaitOnResourceSignals": "true"
         }
       }
     },
@@ -139,7 +146,7 @@
     "LaunchConfig": {  
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Metadata" : {
-        "Comment" : "Install a simple python application",
+        "Comment" : "Install a simple nodejs application",
         "AWS::CloudFormation::Init" : {
 		  "configSets" : {
             "app_install" : ["app_requisites","app_prepare", "app_start", "app_test" ]
@@ -149,18 +156,23 @@
 				"yum" : {
 					"git" : []
 				}
+			},
+			"commands" : {
+			  "01_create_user" : {
+                "command" : "useradd helloworld\n"
+              }
 			}
 		  },
 		  "app_prepare" : {
 			"commands" : {
-			  "01_create_user" : {
-                "command" : "useradd helloworld"
+			  "01_download_repo" : {
+                "command" : "sudo su helloworld -c 'cd ~;git clone https://github.com/rfiestas/nodejs-helloworld.git'\n"
               },
-			  "02_download_repo" : {
-                "command" : "sudo su helloworld -c 'cd ~;git clone https://github.com/rfiestas/python-helloworld.git'"
+			  "02_checkout_repo" : {
+                "command" : { "Fn::Join" : ["", ["sudo su helloworld -c 'cd ~/nodejs-helloworld;git checkout tags/", { "Ref" : "Tag" },"'\n"]] }
               },
-			  "03_checkout_repo" : {
-                "command" : { "Fn::Join" : ["", ["sudo su helloworld -c 'cd ~/python-helloworld;git checkout tags/", { "Ref" : "Tag" },"'"]] }
+			  "03_dependencies" : { 
+				"command" : "sudo su helloworld -c 'cd ~;curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.32.0/install.sh | bash;. ~/.nvm/nvm.sh;nvm install 4.4.5;cd ~/nodejs-helloworld;npm install express'\n"
               }
             }
 		  },
@@ -176,7 +188,7 @@
 
 				"respawn\n",
 
-				"exec sudo su helloworld -c 'cd ~/;python python-helloworld/helloworld.py'\n"
+				"exec sudo su helloworld -c 'cd ~/;~/.nvm/versions/node/v4.4.5/bin/node nodejs-helloworld/app.js'\n"
 				]]}
 			  }
 			},
@@ -189,7 +201,7 @@
 		  "app_test" : {
 			"commands" : {
 			  "01_test" : {
-				"command" : "curl -m 3 localhost:8080/\n"
+				"command" : "sleep 5;curl -m 3 localhost:8080/\n"
 			  }
 			}
 		  }
