@@ -13,7 +13,7 @@
     "InstanceType" : {
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
-      "Default" : "m1.small",
+      "Default" : "t2.micro",
       "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge",
 "m2.2xlarge", "m2.4xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "c1.medium", "c1.xlarge", "c3.large", "c3.xlarge", "c3.2xlarge",
 "c3.4xlarge", "c3.8xlarge", "g2.2xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge",
@@ -32,9 +32,16 @@
 	"Tag": {
       "Description": "Application git tag",
       "Type": "String",
-      "Default": "0.1",
+      "Default": "0.0",
       "AllowedPattern": "(\\d{1,2})\\.(\\d{1,2})([a-zA-Z_])*",
       "ConstraintDescription": "must be a valid Tag \"xx.xx\""
+    },
+	"AplicationRepo": {
+      "Description": "Aplication repository URL",
+      "Type": "String",
+      "Default": "https://github.com/rfiestas/nodejs-helloworld.git",
+      "AllowedPattern": "http(s)*://(.*)\\.git",
+      "ConstraintDescription": "must be a valid repo http(s)://xxxxxxxxxx.git ."
     }
   },
   
@@ -201,12 +208,13 @@
         "Comment" : "Install a simple nodejs application",
         "AWS::CloudFormation::Init" : {
 		  "configSets" : {
-            "app_install" : ["app_requisites","app_prepare", "app_start", "app_test", "install_logs" ]
+            "app_install" : ["app_requisites","app_prepare", "app_start", "app_test", "install_logs", "install_monitoring" ]
           },
 		  "app_requisites": {
 			"packages" : {
 				"yum" : {
-					"git" : []
+					"git" : [],
+					"unzip" : []
 				}
 			},
 			"commands" : {
@@ -218,7 +226,7 @@
 		  "app_prepare" : {
 			"commands" : {
 			  "01_download_repo" : {
-                "command" : "sudo su helloworld -c 'cd ~;git clone https://github.com/rfiestas/nodejs-helloworld.git'\n"
+                "command" : { "Fn::Join" : ["", ["sudo su helloworld -c 'cd ~;git clone ", { "Ref" : "AplicationRepo" },"'\n"]] }
               },
 			  "02_checkout_repo" : {
                 "command" : { "Fn::Join" : ["", ["sudo su helloworld -c 'cd ~/nodejs-helloworld;git checkout tags/", { "Ref" : "Tag" },"'\n"]] }
@@ -374,6 +382,38 @@
                 }
               }
             }
+		  },
+		  "install_monitoring" : {
+            "files" : {
+              "/home/ec2-user/crontab": {
+                "content" : { "Fn::Join" : ["", [
+                  "*/5 * * * * ~/aws-scripts-mon/mon-put-instance-data.pl --mem-used-incl-cache-buff --mem-util --disk-space-util --disk-path=/ --from-cron","\n"
+                  ]]},
+                "mode" : "000600",
+                "owner" : "ec2-user",
+                "group" : "ec2-user"
+              } 
+            },
+            "packages" : {
+              "yum" : {
+				"perl-Switch": [],
+				"perl-DateTime": [],
+				"perl-Sys-Syslog": [],
+				"perl-LWP-Protocol-https": [],
+				"perl-Digest-SHA": []
+              }
+            },
+            "commands":{
+              "01_download_cloudwatch": {
+				"command" : "cd /home/ec2-user;curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O"
+			  },
+			  "02_unzip_cloudwatch":{
+				"command" : "cd /home/ec2-user;unzip CloudWatchMonitoringScripts-1.2.1.zip"
+			  },
+			  "03_add_crontab":{
+			    "command" : "sudo su ec2-user -c '(crontab -l ; cat /home/ec2-user/crontab) | crontab -'"
+			  }
+			}
 		  }
 		}
       },
