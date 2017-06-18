@@ -6,11 +6,17 @@ aws cloud formation python helloworld test
 Initial version, work with python-helloworld 0.0 , 0.1 , 0.2_FAIL
 
 ## Parameters
-**KeyName**: credenciales aws (obligatorio)
-**InstanceType**: por defecto t2.micro (opcional)
-**SSHLocation**: habilita el puerto 22 hacia la red deseada.  (opcional)
-**AplicationRepo**: por defecto https://github.com/rfiestas/nodejs-helloworld.git  (opcional)
-**Tag**: aplica el tag / version deseada , por defecto 0.0 (opcional)
+
+**KeyName**: aws credentials (mandatory)
+
+**InstanceType**: default t2.micro (mandatory)
+
+**SSHLocation**: allow port 22 on desired subnet.  (mandatory)
+
+**AplicationRepo**: default https://github.com/rfiestas/nodejs-helloworld.git  (mandatory)
+
+**Tag**: tag / version, default 0.0 (mandatory)
+
  
 ## Create stack
 ```
