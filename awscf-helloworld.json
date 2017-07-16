@@ -32,7 +32,7 @@
 	"Tag": {
       "Description": "Application git tag",
       "Type": "String",
-      "Default": "0.0",
+      "Default": "2.0",
       "AllowedPattern": "(\\d{1,2})\\.(\\d{1,2})([a-zA-Z_])*",
       "ConstraintDescription": "must be a valid Tag \"xx.xx\""
     },
@@ -208,210 +208,43 @@
         "Comment" : "Install a simple nodejs application",
         "AWS::CloudFormation::Init" : {
 		  "configSets" : {
-            "app_install" : ["app_requisites","app_prepare", "app_start", "app_test", "install_logs", "install_monitoring" ]
+            "app_install" : ["app_requisites","app_prepare", "app_start", "app_test"]
           },
 		  "app_requisites": {
 			"packages" : {
 				"yum" : {
 					"git" : [],
+					"puppet3" : [],
 					"unzip" : []
 				}
 			},
 			"commands" : {
-			  "01_create_user" : {
-                "command" : "useradd helloworld\n"
+			  "01_create_folder" : {
+                "command" : "mkdir /home/www-data && chmod 777 /home/www-data\n"
               }
 			}
 		  },
 		  "app_prepare" : {
 			"commands" : {
 			  "01_download_repo" : {
-                "command" : { "Fn::Join" : ["", ["sudo su helloworld -c 'cd ~;git clone ", { "Ref" : "AplicationRepo" },"'\n"]] }
-              },
-			  "02_checkout_repo" : {
-                "command" : { "Fn::Join" : ["", ["sudo su helloworld -c 'cd ~/nodejs-helloworld;git checkout tags/", { "Ref" : "Tag" },"'\n"]] }
-              },
-			  "03_dependencies" : { 
-				"command" : "sudo su helloworld -c 'cd ~;curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.32.0/install.sh | bash;. ~/.nvm/nvm.sh;nvm install 4.4.5;cd ~/nodejs-helloworld;npm install express'\n"
+                "command" : { "Fn::Join" : ["", ["git clone -b ", { "Ref" : "Tag" }," --recursive ", { "Ref" : "AplicationRepo" }," /home/www-data/nodejs-helloworld" , "\n"]] }
               }
             }
 		  },
 		  "app_start" : {
-		     "files" : {
-			   "/etc/init/helloworld.conf" : {
-				"content" : { "Fn::Join" : ["", [
-				"#helloworld\n",
-				"description \"launch an app\"\n",
-
-				"start on runlevel [2345]\n",
-				"stop on runlevel [!2345]\n",
-
-				"respawn\n",
-
-				"exec sudo su helloworld -c 'cd ~/;~/.nvm/versions/node/v4.4.5/bin/node nodejs-helloworld/app.js > nodejs-helloworld_log.log 2> nodejs-helloworld_err.log'\n"
-				]]}
-			  }
-			},
 			"commands" : {
-              "01_app_start" : {
-                "command" : "start helloworld"
+              "01_app_provision" : {
+                "command" : "puppet apply --hiera_config /home/www-data/nodejs-helloworld/puppet/hiera.yaml --modulepath=/home/www-data/nodejs-helloworld/puppet/modules/ /home/www-data/nodejs-helloworld/puppet/manifests/default.pp --debug\n"
+              },
+			  "02_app_start" : {
+                "command" : "start nodejs_app\n"
               }
             }
 		  },
 		  "app_test" : {
 			"commands" : {
 			  "01_test" : {
-				"command" : "sleep 5;curl -m 3 localhost:8080/\n"
-			  }
-			}
-		  },
-		  "install_logs" : {
-		    "packages":{
-              "yum":{
-                "awslogs":[
-
-                ]
-              }
-            },
-            "files":{
-              "/etc/awslogs/awslogs.conf":{
-                "content":{
-                  "Fn::Join":[
-                    "",
-                    [
-                      "[general]\n",
-                      "state_file= /var/awslogs/state/agent-state\n",
-                      "[/var/log/cloud-init.log]\n",
-                      "file = /var/log/cloud-init.log\n",
-                      "log_group_name = ",
-                      {
-                        "Ref":"CloudFormationLogs"
-                      },
-                      "\n",
-                      "log_stream_name = {instance_id}/cloud-init.log\n",
-                      "datetime_format = \n",
-                      "[/var/log/cloud-init-output.log]\n",
-                      "file = /var/log/cloud-init-output.log\n",
-                      "log_group_name = ",
-                      {
-                        "Ref":"CloudFormationLogs"
-                      },
-                      "\n",
-                      "log_stream_name = {instance_id}/cloud-init-output.log\n",
-                      "datetime_format = \n",
-                      "[/var/log/cfn-init.log]\n",
-                      "file = /var/log/cfn-init.log\n",
-                      "log_group_name = ",
-                      {
-                        "Ref":"CloudFormationLogs"
-                      },
-                      "\n",
-                      "log_stream_name = {instance_id}/cfn-init.log\n",
-                      "datetime_format = \n",
-                      "[/var/log/cfn-hup.log]\n",
-                      "file = /var/log/cfn-hup.log\n",
-                      "log_group_name = ",
-                      {
-                        "Ref":"CloudFormationLogs"
-                      },
-                      "\n",
-                      "log_stream_name = {instance_id}/cfn-hup.log\n",
-                      "datetime_format = \n",
-                      "[/var/log/cfn-wire.log]\n",
-                      "file = /var/log/cfn-wire.log\n",
-                      "log_group_name = ",
-                      {
-                        "Ref":"CloudFormationLogs"
-                      },
-                      "\n",
-                      "log_stream_name = {instance_id}/cfn-wire.log\n",
-                      "datetime_format = \n",
-                      "[/home/helloworld/*.log]\n",
-                      "file = /home/helloworld/*.log\n",
-                      "log_group_name = ",
-                      {
-                        "Ref":"CloudFormationLogs"
-                      },
-                      "\n",
-                      "log_stream_name = {instance_id}/nodejs-helloworld\n",
-                      "datetime_format = %d/%b/%Y:%H:%M:%S\n"
-                    ]
-                  ]
-                },
-                "mode":"000444",
-                "owner":"root",
-                "group":"root"
-              },
-              "/etc/awslogs/awscli.conf":{
-                "content":{
-                  "Fn::Join":[
-                    "",
-                    [
-                      "[plugins]\n",
-                      "cwlogs = cwlogs\n",
-                      "[default]\n",
-                      "region = ",
-                      {
-                        "Ref":"AWS::Region"
-                      },
-                      "\n"
-                    ]
-                  ]
-                },
-                "mode":"000444",
-                "owner":"root",
-                "group":"root"
-              }
-            },
-            "commands":{
-              "01_create_state_directory":{
-                "command":"mkdir -p /var/awslogs/state"
-              },
-              "02_create_my_tmp_directory":{
-                "command":"mkdir -p /tmp/pmd"
-              }
-            },
-            "services":{
-              "sysvinit":{
-                "awslogs":{
-                  "enabled":"true",
-                  "ensureRunning":"true",
-                  "files":[
-                    "/etc/awslogs/awslogs.conf"
-                  ]
-                }
-              }
-            }
-		  },
-		  "install_monitoring" : {
-            "files" : {
-              "/home/ec2-user/crontab": {
-                "content" : { "Fn::Join" : ["", [
-                  "*/5 * * * * ~/aws-scripts-mon/mon-put-instance-data.pl --mem-used-incl-cache-buff --mem-util --disk-space-util --disk-path=/ --from-cron","\n"
-                  ]]},
-                "mode" : "000600",
-                "owner" : "ec2-user",
-                "group" : "ec2-user"
-              } 
-            },
-            "packages" : {
-              "yum" : {
-				"perl-Switch": [],
-				"perl-DateTime": [],
-				"perl-Sys-Syslog": [],
-				"perl-LWP-Protocol-https": [],
-				"perl-Digest-SHA": []
-              }
-            },
-            "commands":{
-              "01_download_cloudwatch": {
-				"command" : "cd /home/ec2-user;curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O"
-			  },
-			  "02_unzip_cloudwatch":{
-				"command" : "cd /home/ec2-user;unzip CloudWatchMonitoringScripts-1.2.1.zip"
-			  },
-			  "03_add_crontab":{
-			    "command" : "sudo su ec2-user -c '(crontab -l ; cat /home/ec2-user/crontab) | crontab -'"
+				"command" : "bash /home/www-data/nodejs-helloworld/tests/test.sh\n"
 			  }
 			}
 		  }
